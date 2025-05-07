@@ -1,82 +1,123 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import axios from "axios";
-import { insertModeratorApplicationSchema } from "@shared/schema";
-import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import { insertApplicationSchema } from "@shared/schema";
+import fetch from "node-fetch";
 
-// Discord webhook URL
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "https://discord.com/api/webhooks/1369614118184816642/Vmk1oXGafBW7RtzSeZOkr2n6j771svKi5MOlSrRrcc7jTnfI5lQsdtEF9xZ2Am2DF3qK";
+// Discord webhook URL - in production this would be in an environment variable
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1369614118184816642/Vmk1oXGafBW7RtzSeZOkr2n6j771svKi5MOlSrRrcc7jTnfI5lQsdtEF9xZ2Am2DF3qK";
 
-// Rate limiting middleware - 1 submission per 15 minutes
-const applicationRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 1, // 1 submission per window
-  standardHeaders: true,
-  message: {
-    message: "Too many applications submitted. Please try again in 15 minutes."
-  }
-});
+// Map to store last submission time by username
+const submissionTimestamps = new Map<string, number>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // API endpoint for submitting an application
-  app.post("/api/apply", applicationRateLimit, async (req, res) => {
+  // Application submission endpoint
+  app.post("/api/application", async (req: Request, res: Response) => {
     try {
-      // Validate the request body
-      const validatedData = insertModeratorApplicationSchema.parse(req.body);
+      // Validate request body
+      const validationResult = insertApplicationSchema.safeParse(req.body);
       
-      // Prepare data for Discord webhook
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid application data", 
+          errors: validationResult.error.errors 
+        });
+      }
+      
+      const applicationData = validationResult.data;
+      const username = applicationData.username;
+      const ipAddress = req.ip || req.connection.remoteAddress || "unknown";
+      
+      // Check rate limit for this specific username
+      const lastSubmissionTime = submissionTimestamps.get(username);
+      const currentTime = Date.now();
+      const fifteenMinutesInMs = 15 * 60 * 1000;
+      
+      if (lastSubmissionTime && currentTime - lastSubmissionTime < fifteenMinutesInMs) {
+        const timeRemaining = Math.ceil((lastSubmissionTime + fifteenMinutesInMs - currentTime) / 60000);
+        return res.status(429).json({ 
+          message: `Rate limit exceeded for this username. Please try again in ${timeRemaining} minute${timeRemaining === 1 ? '' : 's'}.` 
+        });
+      }
+      
+      // Store application in our database
+      const application = await storage.createApplication({
+        ...applicationData,
+        ipAddress
+      });
+      
+      // Send to Discord webhook
       const webhookData = {
         embeds: [{
           title: "New Moderator Application",
-          color: 5763719, // Light green in decimal
+          color: 0x23A55A,
           fields: [
-            { name: "Discord Username", value: validatedData.discordUsername },
-            { name: "About Yourself", value: validatedData.aboutYourself },
-            { name: "Why Join", value: validatedData.whyJoin },
-            { name: "Timezone", value: validatedData.timezone },
-            { name: "Activity Level", value: validatedData.activityLevel },
-            { name: "Professionalism (1-10)", value: validatedData.professionalism.toString() },
-            { name: "Joke", value: validatedData.joke }
+            {
+              name: "Discord Username",
+              value: applicationData.username,
+              inline: true
+            },
+            {
+              name: "Timezone",
+              value: applicationData.timezone,
+              inline: true
+            },
+            {
+              name: "Activity Level",
+              value: applicationData.activityLevel,
+              inline: true
+            },
+            {
+              name: "Professionalism (1-10)",
+              value: applicationData.professionalism.toString(),
+              inline: true
+            },
+            {
+              name: "About",
+              value: applicationData.about
+            },
+            {
+              name: "Why Join",
+              value: applicationData.whyJoin
+            },
+            {
+              name: "Joke",
+              value: applicationData.joke
+            }
           ],
           timestamp: new Date().toISOString()
         }]
       };
       
-      // Send to Discord webhook
-      await axios.post(DISCORD_WEBHOOK_URL, webhookData);
+      try {
+        const webhookResponse = await fetch(DISCORD_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookData),
+        });
+        
+        if (!webhookResponse.ok) {
+          console.error("Discord webhook error:", await webhookResponse.text());
+        }
+      } catch (webhookError) {
+        console.error("Failed to send to Discord webhook:", webhookError);
+        // Continue execution - we don't want to fail the user's submission if only the webhook fails
+      }
       
-      // Save application to storage (with timestamp)
-      const applicationToInsert = {
-        ...validatedData,
-        submittedAt: new Date().toISOString()
-      };
+      // Update rate limit timestamp for this username
+      submissionTimestamps.set(username, currentTime);
       
       // Return success
-      res.status(200).json({ message: "Application submitted successfully!" });
-    } catch (error: any) {
-      console.error("Error submitting application:", error);
+      return res.status(201).json({ 
+        message: "Application submitted successfully", 
+        id: application.id 
+      });
       
-      // Handle validation errors
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation error", 
-          errors: error.errors 
-        });
-      }
-      
-      // Handle webhook errors from axios
-      if (error?.response && typeof error.response === 'object') {
-        const status = error.response.status || 500;
-        const statusText = error.response.statusText || 'Error';
-        return res.status(status).json({ 
-          message: `Discord webhook error: ${status} ${statusText}` 
-        });
-      }
-      
-      // Generic error
-      res.status(500).json({ message: "Failed to submit application" });
+    } catch (error) {
+      console.error("Application submission error:", error);
+      return res.status(500).json({ message: "Failed to submit application" });
     }
   });
 

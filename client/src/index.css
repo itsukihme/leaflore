@@ -3,57 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 7%;
-  --foreground: 0 0% 95%;
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
   --muted: 240 3.7% 15.9%;
   --muted-foreground: 240 5% 64.9%;
-  --popover: 0 0% 12%;
-  --popover-foreground: 0 0% 95%;
-  --card: 0 0% 12%;
-  --card-foreground: 0 0% 95%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 228 7% 18%;
+  --card-foreground: 0 0% 98%;
   --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --primary: 142 70% 50%;
-  --primary-foreground: 0 0% 98%;
+  --input: 226 9% 13%;
+  --primary: 142 71% 45%;
+  --primary-foreground: 211 100% 99%;
   --secondary: 240 3.7% 15.9%;
   --secondary-foreground: 0 0% 98%;
-  --accent: 142 70% 50%;
+  --accent: 240 3.7% 15.9%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 142 70% 50%;
+  --ring: 142 71% 45%;
   --radius: 0.5rem;
   
-  --surface: 0 0% 12%;
-  --surface-darker: 0 0% 6%;
-  --surface-lighter: 0 0% 18%;
-}
-
-.dark {
-  --background: 0 0% 7%;
-  --foreground: 0 0% 95%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --popover: 0 0% 12%;
-  --popover-foreground: 0 0% 95%;
-  --card: 0 0% 12%;
-  --card-foreground: 0 0% 95%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --primary: 142 70% 50%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --accent: 142 70% 50%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --ring: 142 70% 50%;
-  --radius: 0.5rem;
-  
-  --surface: 0 0% 12%;
-  --surface-darker: 0 0% 6%;
-  --surface-lighter: 0 0% 18%;
+  /* Discord specific colors */
+  --discord-dark: 240 10% 3.9%;
+  --discord-darker: 222 14% 4.5%;
+  --discord-container: 228 7% 18%;
+  --discord-input: 226 9% 13%;
+  --discord-accent: 142 71% 45%;
+  --discord-text-primary: 0 0% 100%;
+  --discord-text-secondary: 220 6% 73%;
+  --success-background: 147 45% 13%;
 }
 
 @layer base {
@@ -64,23 +43,16 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
-  
-  .shake {
-    animation: shake 0.5s;
+
+  .discord-slider::-webkit-slider-thumb {
+    @apply appearance-none w-5 h-5 rounded-full bg-white cursor-pointer;
   }
   
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  .discord-slider::-moz-range-thumb {
+    @apply w-5 h-5 rounded-full bg-white cursor-pointer;
   }
-  
-  .scale-in {
-    animation: scale-in 0.3s ease-out;
-  }
-  
-  @keyframes scale-in {
-    0% { transform: scale(0.9); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+
+  .discord-slider {
+    @apply h-2 rounded-md appearance-none cursor-pointer;
   }
 }

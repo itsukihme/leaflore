@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,30 +13,33 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-// Discord Moderator Application Schema
-export const moderatorApplications = pgTable("moderator_applications", {
+// Define application schema
+export const applications = pgTable("applications", {
   id: serial("id").primaryKey(),
-  discordUsername: text("discord_username").notNull(),
-  aboutYourself: text("about_yourself").notNull(),
+  username: text("username").notNull(),
+  about: text("about").notNull(),
   whyJoin: text("why_join").notNull(),
   timezone: text("timezone").notNull(),
   activityLevel: text("activity_level").notNull(),
   professionalism: integer("professionalism").notNull(),
   joke: text("joke").notNull(),
-  submittedAt: text("submitted_at").notNull(),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const moderatorApplicationSchema = createInsertSchema(moderatorApplications).omit({
-  id: true,
-  submittedAt: true,
+// Create insert schema for application
+export const insertApplicationSchema = z.object({
+  username: z.string().min(2),
+  about: z.string().min(10),
+  whyJoin: z.string().min(10),
+  timezone: z.string(),
+  activityLevel: z.string(),
+  professionalism: z.number().min(1).max(10),
+  joke: z.string().min(2),
 });
 
-export const insertModeratorApplicationSchema = moderatorApplicationSchema.extend({
-  professionalism: z.coerce.number().min(1).max(10),
-});
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
 
-export type InsertModeratorApplication = z.infer<typeof insertModeratorApplicationSchema>;
-export type ModeratorApplication = typeof moderatorApplications.$inferSelect;
+export type InsertApplication = z.infer<typeof insertApplicationSchema>;
+export type Application = typeof applications.$inferSelect;
